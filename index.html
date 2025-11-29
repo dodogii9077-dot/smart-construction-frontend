@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Construction OS</title>
+    <link href="https://fonts.googleapis.com/css2?family=Pretendard:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <div class="bg-animation"></div>
+
+    <div id="auth-container" class="auth-container">
+        <div class="glass-card auth-card">
+            <div class="auth-header">
+                <div class="logo-icon"><span class="material-icons-round">apartment</span></div>
+                <h1>Smart Site</h1>
+                <p>미래형 건설 현장 관리 플랫폼</p>
+            </div>
+
+            <div class="toggle-switch">
+                <button id="btn-login" class="active" onclick="showAuthTab('login')">로그인</button>
+                <button id="btn-signup" onclick="showAuthTab('signup')">회원가입</button>
+            </div>
+
+            <form id="login-form" class="auth-form active">
+                <div class="floating-input">
+                    <input type="text" id="login-username" required placeholder=" ">
+                    <label>아이디</label>
+                    <span class="material-icons-round icon">person</span>
+                </div>
+                <div class="floating-input">
+                    <input type="password" id="login-password" required placeholder=" ">
+                    <label>비밀번호</label>
+                    <span class="material-icons-round icon">lock</span>
+                </div>
+                <button type="submit" class="gradient-btn full-width">로그인 시작</button>
+            </form>
+
+            <form id="signup-form" class="auth-form">
+                <div class="grid-2-sm">
+                    <div class="floating-input">
+                        <input type="text" id="signup-username" required placeholder=" ">
+                        <label>아이디</label>
+                    </div>
+                    <div class="floating-input">
+                        <input type="password" id="signup-password" required placeholder=" ">
+                        <label>비밀번호</label>
+                    </div>
+                </div>
+                <div class="grid-2-sm">
+                    <div class="floating-input">
+                        <input type="text" id="signup-fullname" required placeholder=" ">
+                        <label>이름</label>
+                    </div>
+                    <div class="floating-input">
+                        <input type="text" id="signup-phone" required placeholder=" ">
+                        <label>연락처</label>
+                    </div>
+                </div>
+                <div class="grid-2-sm">
+                    <input type="date" id="signup-birth" class="simple-input" required>
+                    <select id="signup-gender" class="simple-input">
+                        <option value="남">남성</option>
+                        <option value="여">여성</option>
+                    </select>
+                </div>
+
+                <div class="floating-input">
+                    <input type="text" id="signup-trade" placeholder=" " value="보통인부">
+                    <label>담당 공종 (예: 철근, 목공)</label>
+                </div>
+
+                <div class="role-selector">
+                    <label>
+                        <input type="radio" name="role" value="worker" checked onclick="toggleSiteCreation()">
+                        <span class="role-box">👷 근로자</span>
+                    </label>
+                    <label>
+                        <input type="radio" name="role" value="manager" onclick="toggleSiteCreation()">
+                        <span class="role-box">👨‍💼 관리자</span>
+                    </label>
+                </div>
+
+                <div id="site-select-group" class="site-section">
+                    <p style="font-size:0.8rem; color:var(--text-sub); margin-bottom:5px; text-align:left;">
+                        * 초기 사용 시 관리자로 '새 현장'을 먼저 만드세요.
+                    </p>
+                    <select id="signup-site-id" class="simple-input">
+                        <option value="">소속 현장 선택 (기존 현장)</option>
+                        <option value="1">Site #1 (존재하는 경우)</option>
+                    </select>
+                </div>
+
+                <div id="site-create-group" class="site-section hidden">
+                    <div class="floating-input">
+                        <input type="checkbox" id="is-new-site" class="chk-btn" onchange="toggleNewSiteInputs()">
+                        <label for="is-new-site" style="position:static; pointer-events:all; cursor:pointer; color:var(--primary); font-weight:bold;">
+                            ✨ 새 현장 개설하기
+                        </label>
+                    </div>
+                    <div id="new-site-inputs" class="hidden animate-fade">
+                        <input type="text" id="new-site-name" class="simple-input" placeholder="현장 이름 (필수)">
+                        <input type="text" id="new-site-loc" class="simple-input" placeholder="현장 주소/위치">
+                    </div>
+                </div>
+
+                <button type="submit" class="gradient-btn full-width" style="margin-top:1rem;">가입 완료</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="app-container" class="app-container hidden">
+        <aside class="sidebar glass-effect">
+            <div class="sidebar-header">
+                <span class="material-icons-round logo-spin">settings_suggest</span>
+                <span>Smart OS</span>
+            </div>
+            <nav class="menu">
+                <button onclick="renderView('dashboard')" class="menu-btn active" data-target="dashboard">
+                    <span class="material-icons-round">dashboard</span> 대시보드
+                </button>
+                <button onclick="renderView('attendance')" class="menu-btn" data-target="attendance">
+                    <span class="material-icons-round">fingerprint</span> 출석 체크
+                </button>
+                <button onclick="renderView('notices')" class="menu-btn" data-target="notices">
+                    <span class="material-icons-round">notifications_active</span> 공지사항
+                </button>
+                <button onclick="renderView('alerts')" class="menu-btn" data-target="alerts">
+                    <span class="material-icons-round">warning_amber</span> 비상 알림
+                </button>
+                <button onclick="renderView('issues')" class="menu-btn" data-target="issues">
+                    <span class="material-icons-round">build_circle</span> 하자 신고
+                </button>
+                <button onclick="renderView('drawings')" class="menu-btn" data-target="drawings">
+                    <span class="material-icons-round">map</span> 도면함
+                </button>
+                <button onclick="renderView('processes')" class="menu-btn" data-target="processes">
+                    <span class="material-icons-round">timeline</span> 공정 관리
+                </button>
+                <button onclick="renderView('profile')" class="menu-btn" data-target="profile">
+                     <span class="material-icons-round">account_circle</span> 내 정보
+                </button>
+                <button onclick="renderView('workers')" class="menu-btn hidden" id="menu-workers" data-target="workers">
+                    <span class="material-icons-round">groups</span> 근로자 명단
+                </button>
+            </nav>
+            <div class="user-profile">
+                <div class="avatar-circle" id="user-avatar">U</div>
+                <div class="user-info">
+                    <span id="nav-username">User</span>
+                    <span id="nav-role" class="badge-mini">Role</span>
+                </div>
+                <button onclick="logout()" class="icon-btn"><span class="material-icons-round">logout</span></button>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header glass-effect">
+                <div class="header-title">
+                    <h2 id="page-title">Dashboard</h2>
+                    <span id="current-site-name" class="site-tag">현장 로딩 중...</span>
+                </div>
+                <div class="header-actions">
+                    <span class="date-display" id="header-date">2023.00.00</span>
+                </div>
+            </header>
+
+            <div id="content-area" class="content-wrapper">
+                </div>
+        </main>
+    </div>
+
+    <div id="toast-container"></div>
+
+    <script src="app.js"></script>
+</body>
+</html>
