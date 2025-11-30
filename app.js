@@ -25,6 +25,30 @@ document.addEventListener("DOMContentLoaded", () => {
 // ==========================
 // 2. 인증 (로그인/회원가입)
 // ==========================
+// ==========================
+// 🔥 현장 목록 불러오기 (공용)
+// ==========================
+async function loadSites() {
+    try {
+        const res = await fetch(`${BASE_URL}/public/sites`);
+        const sites = await res.json();
+
+        const siteSelect = document.getElementById("signup-site-id");
+        siteSelect.innerHTML = `<option value="">소속 현장 선택</option>`;
+
+        sites.forEach(site => {
+            const op = document.createElement("option");
+            op.value = site.id;
+            op.textContent = `${site.name} (${site.location || "위치 없음"})`;
+            siteSelect.appendChild(op);
+        });
+
+        console.log("사이트 목록 로드됨:", sites);
+    } catch (err) {
+        console.error("현장 목록 불러오기 실패:", err);
+    }
+}
+
 function showAuthTab(tab) {
     document.querySelectorAll('.toggle-switch button').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.auth-form').forEach(f => f.classList.remove('active'));
@@ -35,8 +59,12 @@ function showAuthTab(tab) {
     } else {
         document.getElementById('btn-signup').classList.add('active');
         document.getElementById('signup-form').classList.add('active');
+
+        // 🔥 회원가입 화면이 열릴 때 현장 목록 불러오기
+        loadSites();
     }
 }
+
 
 document.getElementById('login-form').addEventListener('submit', async (e) => {
     e.preventDefault();
