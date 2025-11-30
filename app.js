@@ -1,4 +1,4 @@
-const BASE_URL = "https://smart-construction-backend-2.onrender.com";
+const BASE_URL = "http://127.0.0.1:8000";
 
 const state = {
     token: localStorage.getItem("token") || null,
@@ -507,13 +507,126 @@ async function postAlert(){
 async function solveAlert(id){ await apiFetch(`/manager/alerts/emergency/${id}/resolve`,'PUT'); renderView('alerts'); }
 
 // [하자 신고]
+
+// [하자 신고]
 async function loadIssues(container) {
-    let issues = state.user.role==='manager' ? await apiFetch('/manager/issues') : await apiFetch('/issues/me');
-    let html = `<div class="card"><div class="floating-input"><input id="i-title" placeholder=" "><label>문제 제목</label></div><button onclick="postIssue()" class="gradient-btn" style="width:auto;">등록</button></div>`;
-    issues.forEach(i => { html += `<div class="list-item issue"><div><strong>${i.title}</strong><div style="font-size:0.8rem;">${i.description}</div></div><span class="status-badge info">${i.status}</span></div>`; });
-    container.innerHTML = html;
+  const issues = await apiFetch('/issues/me');
+
+  let html = `
+    <div class="card">
+      <div class="grid-2-sm">
+        <div class="floating-input">
+          <input id="issue-title" type="text" required>
+          <label>문제 제목</label>
+        </div>
+        <div class="floating-input">
+          <select id="issue-type">
+            <option value="">유형 선택</option>
+            <option value="안전">안전</option>
+            <option value="품질">품질</option>
+            <option value="공정">공정</option>
+            <option value="기타">기타</option>
+          </select>
+          <label>문제 유형</label>
+        </div>
+      </div>
+
+      <div class="floating-input">
+        <textarea id="issue-desc" rows="3" required></textarea>
+        <label>문제 내용</label>
+      </div>
+
+      <div class="grid-2-sm" style="align-items:center;margin-top:16px;">
+        <div>
+          <input id="issue-photo" type="file" accept="image/*">
+        </div>
+        <div style="text-align:right;">
+          <button class="gradient-btn" onclick="postIssue()">등록</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  html += `
+    <div class="card">
+      <table>
+        <tr style="color:#666;">
+          <th>번호</th>
+          <th>제목</th>
+          <th>유형</th>
+          <th>상태</th>
+          <th>등록일</th>
+          <th>사진</th>
+        </tr>
+  `;
+
+  issues.forEach(i => {
+    const date = i.created_at ? i.created_at.substring(0, 10) : '';
+    const hasImg = i.image_url ? 'O' : '-';
+
+    html += `
+      <tr>
+        <td>${i.id}</td>
+        <td>${i.title}</td>
+        <td>${i.issue_type || '-'}</td>
+        <td><span class="status-badge info">${i.status}</span></td>
+        <td>${date}</td>
+        <td>${hasImg}</td>
+      </tr>
+    `;
+  });
+
+  html += '</table></div>';
+
+  container.innerHTML = html;
 }
-async function postIssue(){ await apiFetch('/issues','POST',{title:document.getElementById('i-title').value, description:"상세 내용", issue_type:"기타"}); renderView('issues'); }
+
+async function postIssue() {
+  const title = document.getElementById('issue-title').value.trim();
+  const desc  = document.getElementById('issue-desc').value.trim();
+  const type  = document.getElementById('issue-type').value;
+  const fileInput = document.getElementById('issue-photo');
+
+  if (!title || !desc) {
+    showToast('제목과 내용을 입력해 주세요.');
+    return;
+  }
+
+  const formData = new FormData();
+  formData.append('title', title);
+  formData.append('description', desc);
+  if (type) {
+    formData.append('issue_type', type);
+  }
+  if (fileInput.files.length > 0) {
+    formData.append('photo', fileInput.files[0]);
+  }
+
+  try {
+    const res = await fetch(`${BASE_URL}/issues`, {
+      method: 'POST',
+      headers: {
+        // FormData 쓸 때는 Content-Type 설정하면 안 됨!
+        'Authorization': `Bearer ${state.token}`
+      },
+      body: formData
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error(text);
+      throw new Error('하자 신고 등록 실패');
+    }
+
+    showToast('하자 신고가 등록되었습니다.');
+    renderView('issues');
+  } catch (e) {
+    console.error(e);
+    alert('하자 신고 등록 중 오류가 발생했습니다.');
+  }
+}
+
+
 
 // [도면 관리 - 이미지 미리보기 FIX]
 async function loadDrawings(container) {
@@ -539,7 +652,12 @@ async function loadDrawings(container) {
         <div class="card" style="text-align:center;">
             ${previewHtml}
             <h4 style="margin-bottom:5px;">${d.title}</h4>
-            <a href="${fileUrl}" target="_blank" class="status-badge info" style="text-decoration:none;">다운로드 / 보기</a>
+            <button type="button"
+                    class="status-badge info"
+                    style="text-decoration:none;"
+                    onclick="openDrawingFile(${d.id})">
+                다운로드 / 보기
+            </button>
             ${state.user.role==='manager'?`<button onclick="delDwg(${d.id})" class="icon-btn" style="display:block; margin:10px auto;">❌ 삭제</button>`:''}
         </div>`;
     });
@@ -549,6 +667,42 @@ async function loadDrawings(container) {
 
     // [중요] HTML 렌더링 후, 이미지들을 실제로 로드하는 함수 호출
     loadAuthenticatedImages();
+}
+async function openDrawingFile(drawingId) {
+    if (!state.token) {
+        alert('먼저 로그인 해 주세요.');
+        return;
+    }
+
+    try {
+        const res = await fetch(`${BASE_URL}/drawings/${drawingId}/file`, {
+            method: 'GET',
+            headers: {
+                'Authorization': `Bearer ${state.token}`
+            }
+        });
+
+        if (!res.ok) {
+            const errText = await res.text();
+            console.error(errText);
+            throw new Error('도면 파일을 불러오지 못했습니다.');
+        }
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        // 새 탭으로 열어서 보기
+        window.open(url, '_blank');
+
+        // 메모리 정리 (1분 뒤에 해제)
+        setTimeout(() => {
+            window.URL.revokeObjectURL(url);
+        }, 60000);
+
+    } catch (e) {
+        console.error(e);
+        showToast(e.message || '도면 파일을 여는 중 오류가 발생했습니다.', true);
+    }
 }
 
 // ✅ 출석 CSV(엑셀용) 다운로드
@@ -687,6 +841,49 @@ async function searchWorkerById() {
         showToast('해당 아이디를 찾을 수 없습니다.', true);
     }
 }
+// ===== 도면 파일 다운로드 / 보기 (인증 포함) =====
+async function downloadDrawingFile(drawingId, filename = "drawing") {
+  if (!state.token) {
+    alert("로그인이 필요합니다. 다시 로그인 해주세요.");
+    return;
+  }
+
+  const url = `${BASE_URL}/drawings/${drawingId}/file`;
+
+  try {
+    const res = await fetch(url, {
+      headers: {
+        Authorization: `Bearer ${state.token}`,
+      },
+    });
+
+    if (!res.ok) {
+      throw new Error(`다운로드 실패: ${res.status}`);
+    }
+
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+
+    // 새 탭에서 보기 시도
+    const win = window.open(blobUrl, "_blank");
+
+    // 팝업이 막혔으면 강제로 다운로드
+    if (!win) {
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename || "drawing";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    }
+
+    // 너무 빨리 revoke 하면 새 탭에서 못 볼 수 있어서 약간 딜레이
+    setTimeout(() => URL.revokeObjectURL(blobUrl), 60 * 1000);
+  } catch (err) {
+    console.error(err);
+    alert("도면 파일을 불러오지 못했습니다.");
+  }
+}
 
 // ** 인증된 이미지 로더 함수 **
 // 일반 <img src>는 헤더를 못 보내서 401 에러가 남 -> fetch로 가져와서 blob으로 변환
@@ -716,14 +913,119 @@ async function delDwg(id){ if(confirm('삭제?')) { await apiFetch(`/manager/dra
 
 // [공정 관리]
 async function loadProcesses(container) {
-    let list = await apiFetch('/processes');
-    let html = `<div class="card"><div class="grid-2-sm"><input id="p-loc" class="simple-input" placeholder="위치"><input id="p-work" class="simple-input" placeholder="작업명"></div><button onclick="postProc()" class="gradient-btn">일정 추가</button></div>`;
-    html += '<div class="card"><table><tr style="color:#666;"><th>날짜</th><th>위치</th><th>작업</th><th>상태</th></tr>';
-    list.forEach(p => { html += `<tr><td>${p.start_date||'-'}</td><td>${p.location}</td><td>${p.work_name}</td><td><span class="status-badge info">${p.status}</span></td></tr>`; });
-    html += '</table></div>';
-    container.innerHTML = html;
+  const list = await apiFetch('/processes');
+
+  let html = `
+    <div class="card">
+      <div class="grid-2-sm">
+        <div class="floating-input">
+          <input id="p-loc" type="text" required>
+          <label>위치</label>
+        </div>
+        <div class="floating-input">
+          <input id="p-work" type="text" required>
+          <label>작업명</label>
+        </div>
+      </div>
+
+      <div class="grid-2-sm" style="margin-top:16px;">
+        <div class="floating-input">
+          <input id="p-start" type="date">
+          <label>시작일</label>
+        </div>
+        <div class="floating-input">
+          <input id="p-end" type="date">
+          <label>종료일</label>
+        </div>
+      </div>
+
+      <div class="grid-2-sm" style="margin-top:16px;">
+        <div class="floating-input">
+          <select id="p-status">
+            <option value="계획">계획</option>
+            <option value="진행 중">진행 중</option>
+            <option value="완료">완료</option>
+          </select>
+          <label>상태</label>
+        </div>
+        <div style="text-align:right; display:flex; align-items:center; justify-content:flex-end;">
+          <button class="gradient-btn" onclick="postProc()">일정 추가</button>
+        </div>
+      </div>
+    </div>
+  `;
+
+  html += `
+    <div class="card">
+      <table>
+        <tr style="color:#666;">
+          <th>날짜</th>
+          <th>위치</th>
+          <th>작업</th>
+          <th>상태</th>
+        </tr>
+  `;
+
+  list.forEach(p => {
+    const start = p.start_date || '';
+    const end   = p.end_date || '';
+    const range =
+      start && end ? `${start} ~ ${end}` :
+      start         ? start :
+      end           ? end :
+      '-';
+
+    html += `
+      <tr>
+        <td>${range}</td>
+        <td>${p.location}</td>
+        <td>${p.work_name}</td>
+        <td><span class="status-badge info">${p.status || '계획'}</span></td>
+      </tr>
+    `;
+  });
+
+  html += '</table></div>';
+
+  container.innerHTML = html;
 }
-async function postProc(){ await apiFetch('/processes','POST',{location:document.getElementById('p-loc').value, work_name:document.getElementById('p-work').value}); renderView('processes'); }
+
+async function postProc() {
+  const loc    = document.getElementById('p-loc').value.trim();
+  const work   = document.getElementById('p-work').value.trim();
+  const start  = document.getElementById('p-start').value;
+  const end    = document.getElementById('p-end').value;
+  const status = document.getElementById('p-status').value;
+
+  if (!loc || !work) {
+    showToast('위치와 작업명을 입력해 주세요.');
+    return;
+  }
+
+  await apiFetch('/processes', 'POST', {
+    location:   loc,
+    work_name:  work,
+    start_date: start || null,
+    end_date:   end   || null,
+    status:     status
+  });
+
+  showToast('공정이 등록되었습니다.');
+  renderView('processes');
+}
+
+
+async function updateProcStatus(id, status) {
+    try {
+        await apiFetch(`/processes/${id}`, 'PUT', { status });
+        showToast('공정 상태 변경 완료');
+    } catch (e) {
+        showToast(e.message, true);
+        renderView('processes');
+    }
+}
+
+
 
 // [관리자 전용: 근로자 명단]
 async function loadWorkers(container) {
