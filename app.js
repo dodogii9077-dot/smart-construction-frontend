@@ -1,4 +1,4 @@
-const BASE_URL = "https://smart-construction-backend-2.onrender.com";
+const BASE_URL = "https://smart-construction-backend-1.onrender.com";
 
 const state = {
     token: localStorage.getItem("token") || null,
