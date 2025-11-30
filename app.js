@@ -536,12 +536,76 @@ async function solveAlert(id){ await apiFetch(`/manager/alerts/emergency/${id}/r
 
 // [하자 신고]
 async function loadIssues(container) {
-    let issues = state.user.role==='manager' ? await apiFetch('/manager/issues') : await apiFetch('/issues/me');
+    let issues = [];
+    try {
+        issues = state.user.role === 'manager' ? await apiFetch('/manager/issues') : await apiFetch('/issues/me');
+        // apiFetch가 null 반환할 수도 있으니 방어
+        if (!issues) issues = [];
+    } catch (err) {
+        console.error("하자 신고 로딩 에러:", err);
+        showToast(`하자 신고 로딩 실패: ${err.message}`, true);
+
+        // 에러일 때도 기본 UI 보여주기
+        container.innerHTML = `
+            <div class="card">
+                <div class="floating-input">
+                    <input id="i-title" placeholder=" "><label>문제 제목</label>
+                </div>
+                <button onclick="postIssue()" class="gradient-btn" style="width:auto;">등록</button>
+            </div>
+            <div class="card">
+                <p style="color:#ef4444;">하자 신고를 불러오는 중 오류가 발생했습니다. 콘솔을 확인하세요.</p>
+            </div>
+        `;
+        return;
+    }
+
+    // 정상 흐름
     let html = `<div class="card"><div class="floating-input"><input id="i-title" placeholder=" "><label>문제 제목</label></div><button onclick="postIssue()" class="gradient-btn" style="width:auto;">등록</button></div>`;
-    issues.forEach(i => { html += `<div class="list-item issue"><div><strong>${i.title}</strong><div style="font-size:0.8rem;">${i.description}</div></div><span class="status-badge info">${i.status}</span></div>`; });
+
+    if (!Array.isArray(issues) || issues.length === 0) {
+        html += `<div class="empty-state"><p>등록된 하자/문제가 없습니다.</p></div>`;
+    } else {
+        issues.forEach(i => {
+            html += `<div class="list-item issue">
+                        <div>
+                          <strong>${i.title}</strong>
+                          <div style="font-size:0.8rem;">${i.description || ''}</div>
+                        </div>
+                        <span class="status-badge info">${i.status || ''}</span>
+                     </div>`;
+        });
+    }
+
     container.innerHTML = html;
 }
-async function postIssue(){ await apiFetch('/issues','POST',{title:document.getElementById('i-title').value, description:"상세 내용", issue_type:"기타"}); renderView('issues'); }
+
+async function postIssue() {
+    const title = document.getElementById('i-title').value || '';
+    if (!title.trim()) return showToast("제목을 입력해주세요.", true);
+
+    // 예시: 상세 내용을 입력 UI가 없으니 간단하게 처리 (원하면 상세입력 요소 추가)
+    const description = "상세 내용";
+    const issue_type = "기타";
+
+    const fd = new FormData();
+    fd.append('title', title);
+    fd.append('description', description);
+    fd.append('issue_type', issue_type);
+
+    // 만약 사진 첨부 input이 있다면:
+    // const photo = document.getElementById('i-photo').files[0];
+    // if (photo) fd.append('photo', photo);
+
+    try {
+        await apiFetch('/issues', 'POST', fd);
+        showToast("하자 신고가 등록되었습니다.");
+        renderView('issues'); // 목록 갱신
+    } catch (e) {
+        console.error("하자 등록 실패:", e);
+        showToast(e.message || "등록 실패", true);
+    }
+}
 
 // [도면 관리 - 이미지 미리보기 FIX]
 async function loadDrawings(container) {
@@ -805,20 +869,57 @@ async function loadWorkers(container) {
 
 
 // [유틸리티]
+// 기존 apiFetch 대체 — FormData 처리, 상세 에러 로깅 추가
 async function apiFetch(ep, m='GET', b=null) {
-    let opts = {method:m, headers:{'Authorization':`Bearer ${state.token}`}};
-    if(b) { opts.headers['Content-Type']='application/json'; opts.body=JSON.stringify(b); }
+    let opts = { method: m, headers: { 'Authorization': `Bearer ${state.token}` } };
 
-    let res = await fetch(`${BASE_URL}${ep}`, opts);
-    if(!res.ok) {
-        let errDetail = "요청 실패";
+    // b가 FormData면 Content-Type 헤더를 직접 설정하지 말 것
+    if (b) {
+        if (b instanceof FormData) {
+            opts.body = b;
+            // don't set Content-Type — browser will add multipart/form-data boundary
+        } else {
+            opts.headers['Content-Type'] = 'application/json';
+            opts.body = JSON.stringify(b);
+        }
+    }
+
+    const url = `${BASE_URL}${ep}`;
+    let res;
+    try {
+        res = await fetch(url, opts);
+    } catch (networkErr) {
+        console.error("네트워크/Fetch 에러:", networkErr, url, opts);
+        throw new Error("네트워크 오류가 발생했습니다.");
+    }
+
+    if (!res.ok) {
+        // 가능한 상세 에러 메시지 추출
+        let errDetail = `HTTP ${res.status}`;
         try {
             const errJson = await res.json();
-            errDetail = errJson.detail;
-        } catch(e) {}
-        throw new Error(errDetail);
+            // FastAPI 에러는 보통 {detail: "..."} 형태
+            if (errJson && errJson.detail) errDetail = errJson.detail;
+            else errDetail = JSON.stringify(errJson);
+        } catch (parseErr) {
+            // JSON 파싱 실패하면 텍스트로 시도
+            try {
+                const text = await res.text();
+                if (text) errDetail = text;
+            } catch (e) {}
+        }
+        console.error("API 에러:", url, res.status, errDetail);
+        throw new Error(errDetail || "요청 실패");
     }
-    return res.json();
+
+    // 정상 응답인데 body가 비어있을 수 있음 (204 등) -> 빈 배열/객체로 처리
+    const text = await res.text();
+    if (!text) return null;
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        return text;
+    }
 }
 function showToast(msg, err=false) {
     let t = document.createElement('div'); t.className = `toast ${err?'error':''}`;
