@@ -846,10 +846,27 @@ async function loadProcesses(container) {
 
     let html = `
     <div class="card">
-        <div class="grid-3-sm">
-            <input id="p-date" type="date" class="simple-input">
-            <input id="p-loc" class="simple-input" placeholder="위치">
-            <input id="p-work" class="simple-input" placeholder="작업명">
+        <div class="card">
+            <h3>새 공정 추가</h3>
+            <div class="input-group process-input-group">
+                <div class="date-range-group">
+                    <label>시작 예정일</label>
+                    <input id="p-start-date" type="date">
+                </div>
+                <div class="date-range-group">
+                    <label>종료 예정일</label>
+                    <input id="p-end-date" type="date">
+                </div>
+                <select id="p-status">
+                    <option value="계획">계획</option>
+                    <option value="작업중">작업중</option>
+                    <option value="완료">완료</option>
+                </select>
+                <input id="p-loc" placeholder="위치 (예: 1층 3구역)" required>
+                <input id="p-work" placeholder="공정명 (예: 철근 배근)" required>
+                <input id="p-desc" placeholder="상세 설명 (선택)">
+                <button onclick="postProc()" class="gradient-btn">등록</button>
+            </div>
         </div>
 
         <select id="p-status" class="simple-input" style="margin-top:10px;">
@@ -896,12 +913,34 @@ async function loadProcesses(container) {
 
 // 일정 추가 POST
 async function postProc() {
-    await apiFetch('/processes', 'POST', {
-        start_date: document.getElementById('p-date').value,
-        location: document.getElementById('p-loc').value,
-        work_name: document.getElementById('p-work').value,
-        status: document.getElementById('p-status').value
-    });
+    // ✅ 시작일, 종료일, 상태 값 읽기
+    const start_date = document.getElementById('p-start-date').value;
+    const end_date = document.getElementById('p-end-date').value;
+    const status = document.getElementById('p-status').value;
+    
+    const location = document.getElementById('p-loc').value;
+    const work_name = document.getElementById('p-work').value;
+    const description = document.getElementById('p-desc').value;
+
+    if (!location || !work_name) {
+        showToast("위치와 공정명은 필수 입력 사항입니다.", true);
+        return;
+    }
+
+    try {
+        await apiFetch('/processes', 'POST', {
+            // 빈 문자열이 아닌 경우에만 값을 포함하고, 빈 경우 null로 처리
+            start_date: start_date || null,
+            end_date: end_date || null,
+            status: status,
+            location: location,
+            work_name: work_name,
+            description: description,
+        });
+        showToast("새 공정이 등록되었습니다. ✨");
+    } catch (e) {
+        showToast(`공정 등록 실패: ${e.message}`, true);
+    }
     renderView('processes');
 }
 
