@@ -1,4 +1,4 @@
-const BASE_URL = "https://smart-construction-backend-1.onrender.com";
+const BASE_URL = "https://smart-construction-backend-2.onrender.com";
 
 const state = {
     token: localStorage.getItem("token") || null,
@@ -609,6 +609,34 @@ async function postIssue() {
 
 // [도면 관리 - 이미지 미리보기 FIX]
 async function loadDrawings(container) {
+    async function downloadDrawing(id, filename) {
+    try {
+        const res = await fetch(`${BASE_URL}/drawings/${id}/file`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${state.token}`
+            }
+        });
+
+        if (!res.ok) throw new Error("파일 다운로드 실패");
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "drawing";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(url);
+        showToast("도면 다운로드 완료!");
+    } catch (e) {
+        showToast(e.message, true);
+    }
+}
+
     let list = await apiFetch('/drawings');
     let html = state.user.role==='manager' ? `<div class="card"><input type="file" id="d-file"><button onclick="upDrawing()" class="gradient-btn">업로드</button></div>` : '';
     html += '<div class="grid-2-sm">';
@@ -631,7 +659,12 @@ async function loadDrawings(container) {
         <div class="card" style="text-align:center;">
             ${previewHtml}
             <h4 style="margin-bottom:5px;">${d.title}</h4>
-            <a href="${fileUrl}" target="_blank" class="status-badge info" style="text-decoration:none;">다운로드 / 보기</a>
+            <button class="status-badge info"
+                onclick="downloadDrawing(${d.id}, '${d.title}')"
+                style="text-decoration:none; cursor:pointer;">
+                다운로드
+            </button>
+
             ${state.user.role==='manager'?`<button onclick="delDwg(${d.id})" class="icon-btn" style="display:block; margin:10px auto;">❌ 삭제</button>`:''}
         </div>`;
     });
@@ -933,4 +966,31 @@ function formatTime(iso) {
         hour: '2-digit',
         minute: '2-digit'
     });
+}
+async function downloadDrawing(id, filename) {
+    try {
+        const res = await fetch(`${BASE_URL}/drawings/${id}/file`, {
+            method: "GET",
+            headers: {
+                "Authorization": `Bearer ${state.token}`
+            }
+        });
+
+        if (!res.ok) throw new Error("파일 다운로드 실패");
+
+        const blob = await res.blob();
+        const url = window.URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename || "drawing";
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+
+        window.URL.revokeObjectURL(url);
+        showToast("도면 다운로드 완료!");
+    } catch (e) {
+        showToast(e.message, true);
+    }
 }
