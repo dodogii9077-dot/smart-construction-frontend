@@ -840,15 +840,76 @@ async function upDrawing(){
 async function delDwg(id){ if(confirm('삭제?')) { await apiFetch(`/manager/drawings/${id}`,'DELETE'); renderView('drawings'); } }
 
 // [공정 관리]
+// [공정 관리]
 async function loadProcesses(container) {
     let list = await apiFetch('/processes');
-    let html = `<div class="card"><div class="grid-2-sm"><input id="p-loc" class="simple-input" placeholder="위치"><input id="p-work" class="simple-input" placeholder="작업명"></div><button onclick="postProc()" class="gradient-btn">일정 추가</button></div>`;
-    html += '<div class="card"><table><tr style="color:#666;"><th>날짜</th><th>위치</th><th>작업</th><th>상태</th></tr>';
-    list.forEach(p => { html += `<tr><td>${p.start_date||'-'}</td><td>${p.location}</td><td>${p.work_name}</td><td><span class="status-badge info">${p.status}</span></td></tr>`; });
-    html += '</table></div>';
+
+    let html = `
+    <div class="card">
+        <div class="grid-3-sm">
+            <input id="p-date" type="date" class="simple-input">
+            <input id="p-loc" class="simple-input" placeholder="위치">
+            <input id="p-work" class="simple-input" placeholder="작업명">
+        </div>
+
+        <select id="p-status" class="simple-input" style="margin-top:10px;">
+            <option value="계획">계획</option>
+            <option value="작업중">작업중</option>
+            <option value="완료">완료</option>
+        </select>
+
+        <button onclick="postProc()" class="gradient-btn" style="margin-top:10px;">일정 추가</button>
+    </div>
+    `;
+
+    html += `
+    <div class="card">
+        <table>
+            <tr style="color:#666;">
+                <th>날짜</th><th>위치</th><th>작업</th><th>상태</th><th>변경</th>
+            </tr>
+    `;
+
+    list.forEach(p => {
+        html += `
+        <tr>
+            <td>${p.start_date || '-'}</td>
+            <td>${p.location}</td>
+            <td>${p.work_name}</td>
+            <td>
+                <span class="status-badge info">${p.status}</span>
+            </td>
+            <td>
+                <select onchange="updateProc(${p.id}, this.value)" class="simple-input">
+                    <option value="계획" ${p.status === '계획' ? 'selected':''}>계획</option>
+                    <option value="작업중" ${p.status === '작업중' ? 'selected':''}>작업중</option>
+                    <option value="완료" ${p.status === '완료' ? 'selected':''}>완료</option>
+                </select>
+            </td>
+        </tr>`;
+    });
+
+    html += `</table></div>`;
+
     container.innerHTML = html;
 }
-async function postProc(){ await apiFetch('/processes','POST',{location:document.getElementById('p-loc').value, work_name:document.getElementById('p-work').value}); renderView('processes'); }
+
+// 일정 추가 POST
+async function postProc() {
+    await apiFetch('/processes', 'POST', {
+        start_date: document.getElementById('p-date').value,
+        location: document.getElementById('p-loc').value,
+        work_name: document.getElementById('p-work').value,
+        status: document.getElementById('p-status').value
+    });
+    renderView('processes');
+}
+
+// 상태 변경 PATCH
+async function updateProc(id, newStatus) {
+    await apiFetch(`/processes/${id}`, 'PATCH', { status: newStatus });
+    showToast("상태가 변경되었습니다.");
+}
 
 // [관리자 전용: 근로자 명단]
 async function loadWorkers(container) {
