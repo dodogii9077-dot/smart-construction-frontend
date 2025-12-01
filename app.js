@@ -916,7 +916,7 @@ async function postProc() {
     // ✅ 시작일, 종료일, 상태 값 읽기
     const start_date = document.getElementById('p-start-date').value;
     const end_date = document.getElementById('p-end-date').value;
-    const status = document.getElementById('p-status').value;
+    const status = document.getElementById('p-status').value; 
     
     const location = document.getElementById('p-loc').value;
     const work_name = document.getElementById('p-work').value;
@@ -929,10 +929,10 @@ async function postProc() {
 
     try {
         await apiFetch('/processes', 'POST', {
-            // 빈 문자열이 아닌 경우에만 값을 포함하고, 빈 경우 null로 처리
-            start_date: start_date || null,
-            end_date: end_date || null,
-            status: status,
+            // 날짜와 상태 정보 포함
+            start_date: start_date || null, // 값이 없으면 null로 전송
+            end_date: end_date || null,     // 값이 없으면 null로 전송
+            status: status,                 // 선택된 상태값 전송
             location: location,
             work_name: work_name,
             description: description,
