@@ -946,8 +946,16 @@ async function postProc() {
 
 // 상태 변경 PATCH
 async function updateProc(id, newStatus) {
-    await apiFetch(`/processes/${id}`, 'PATCH', { status: newStatus });
-    showToast("상태가 변경되었습니다.");
+    try {
+        await apiFetch(`/processes/${id}`, 'PATCH', { status: newStatus });
+        showToast("상태가 변경되었습니다.");
+
+        // 🔥 변경된 상태가 화면에 즉시 반영되도록 다시 렌더링
+        renderView('processes');
+
+    } catch (e) {
+        showToast("상태 변경 실패: " + e.message, true);
+    }
 }
 
 // [관리자 전용: 근로자 명단]
